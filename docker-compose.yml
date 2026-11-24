@@ -1,0 +1,64 @@
+name: strava-sync
+
+services:
+  server:
+    build:
+      context: .
+      network: host
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    network_mode: host
+    environment:
+      MCP_HOST: 127.0.0.1
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL:-}
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      MCP_PATH_SECRET: ${MCP_PATH_SECRET:-}
+    volumes:
+      - ./inbox:/app/inbox:ro
+      - ./archive:/app/archive
+    command: ["python", "-m", "server.mcp_server"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  drive-ingest:
+    build:
+      context: .
+      network: host
+    network_mode: host
+    profiles: ["drive"]
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL:-}
+      DRIVE_FOLDER_ID: ${DRIVE_FOLDER_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      DRIVE_INGEST_TIME: ${DRIVE_INGEST_TIME:-06:00}
+      DRIVE_INGEST_TIMEZONE: ${DRIVE_INGEST_TIMEZONE:-Asia/Kolkata}
+      DRIVE_INGEST_TIMEOUT_S: ${DRIVE_INGEST_TIMEOUT_S:-1800}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./archive:/app/archive
+    command: ["python", "-m", "server.scheduler"]
