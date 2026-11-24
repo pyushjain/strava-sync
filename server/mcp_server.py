@@ -8,9 +8,11 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from .analytics import Analytics
-from .store import load_environment, supabase_url
+from .store import load_environment
 
 SERVER_INSTRUCTIONS = """This connector provides read-only running/activity analytics
 from ingested Health Connect exports, not the full Strava API or live Strava data.
@@ -50,7 +52,7 @@ def create_server() -> FastMCP:
         allowed_hosts.append(parsed.netloc)
         allowed_origins.append(public_url)
     server = FastMCP(
-        "Strava Sync", host=os.getenv("MCP_HOST", "127.0.0.1"),
+        "Strava Sync", host=os.getenv("MCP_HOST", "0.0.0.0"),
         instructions=SERVER_INSTRUCTIONS,
         streamable_http_path=path, stateless_http=True, json_response=True,
         transport_security=TransportSecuritySettings(
@@ -59,6 +61,10 @@ def create_server() -> FastMCP:
         ),
     )
     annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+
+    @server.custom_route("/healthz", methods=["GET"])
+    async def healthz(request: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok"})
 
     @server.tool(annotations=annotations)
     def get_data_status() -> dict[str, Any]:
@@ -116,15 +122,18 @@ def create_app():
 def main():
     load_environment()
     try:
-        supabase_url()
         app = create_app()
-        port = int(os.getenv("MCP_PORT", "8000"))
+        port_setting = "PORT" if "PORT" in os.environ else "MCP_PORT"
+        try:
+            port = int(os.getenv(port_setting, "8000"))
+        except ValueError:
+            raise ValueError(f"{port_setting} must be an integer between 1 and 65535") from None
         if not 1 <= port <= 65535:
-            raise ValueError("MCP_PORT must be between 1 and 65535")
+            raise ValueError(f"{port_setting} must be between 1 and 65535")
     except ValueError as exc:
         raise SystemExit(str(exc)) from None
     # Access logs are disabled because the URL can contain the path secret.
-    uvicorn.run(app, host=os.getenv("MCP_HOST", "127.0.0.1"),
+    uvicorn.run(app, host=os.getenv("MCP_HOST", "0.0.0.0"),
                 port=port, access_log=False,
                 log_level="warning")
 

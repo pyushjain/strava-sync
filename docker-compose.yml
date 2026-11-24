@@ -27,7 +27,7 @@ services:
       - ./archive:/app/archive
     command: ["python", "-m", "server.mcp_server"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=5).close()"]
+      test: ["CMD", "python", "-c", "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5); assert response.status == 200"]
       interval: 30s
       timeout: 10s
       start_period: 20s

@@ -1,21 +1,14 @@
-# Generate a random value to store as MCP_PATH_SECRET in Doppler.
+# Generate a random value to store as MCP_PATH_SECRET.
 path-secret:
     python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
-# Run the local stack using Doppler's development config.
+# Run the local MCP server using .env.
 local:
-    doppler run --project strava-sync --config dev -- docker compose --profile drive up --build -d
+    docker compose up --build -d
 
-# Run the production stack (set DOPPLER_TOKEN on the production host).
-prod:
-    doppler run --project strava-sync --config prd -- docker compose --profile drive up --build -d
-
-# Apply updated secrets to each stack.
+# Apply updated local settings.
 local-refresh:
-    doppler run --project strava-sync --config dev -- docker compose --profile drive up -d --force-recreate
-
-prod-refresh:
-    doppler run --project strava-sync --config prd -- docker compose --profile drive up -d --force-recreate
+    docker compose up -d --force-recreate
 
 logs:
     docker compose --profile drive logs -f
@@ -29,7 +22,4 @@ test:
 
 # Explicit local ingestion; a bad inbox export never blocks MCP startup.
 local-ingest:
-    doppler run --project strava-sync --config dev -- docker compose exec server python -m server.ingest --source local --path /app/inbox
-
-prod-ingest:
-    doppler run --project strava-sync --config prd -- docker compose exec server python -m server.ingest --source local --path /app/inbox
+    docker compose exec server python -m server.ingest --source local --path /app/inbox
