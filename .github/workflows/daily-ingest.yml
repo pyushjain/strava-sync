@@ -29,8 +29,6 @@ jobs:
         run: pip install -c requirements.lock '.[drive]'
       - name: Ingest Google Drive export
         env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          DOPPLER_SERVICE_TOKEN: ${{ secrets.DOPPLER_SERVICE_TOKEN }}
           STRAVA_SYNC_ARCHIVE: ${{ runner.temp }}/strava-sync-archive
-        run: python -m server.ingest --source drive
+        run: python -m server.doppler_ingest

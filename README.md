@@ -73,7 +73,7 @@ appropriate to your data.
 Enable the Google Drive API for your Google Cloud project, create a service
 account, and share the export folder with its email address as a **viewer**.
 Keep Health Connect ZIP exports in that folder. Save the service-account JSON
-and folder ID as the GitHub secrets below.
+and folder ID in the Doppler configuration described below.
 
 ### 2. Render deployment
 
@@ -132,17 +132,33 @@ Health success indicates HTTP liveness, not database connectivity or data freshn
 
 ### 4. GitHub Actions ingestion
 
-Under **Settings → Secrets and variables → Actions → New repository secret**, add:
+Create a Doppler configuration dedicated to ingestion with these variables:
 
-| Secret | Purpose |
+| Doppler variable | Purpose |
 | --- | --- |
 | `SUPABASE_DB_URL` | PostgreSQL connection URI |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Entire service-account JSON |
 | `DRIVE_FOLDER_ID` | Google Drive export folder |
 
 Paste the entire original JSON object, including the private key, into the JSON
-secret. Do not base64-encode it or wrap it in another JSON string. Credentials
+variable. Do not base64-encode it or wrap it in another JSON string. Credentials
 are parsed in memory; no credentials file is written.
+
+Create a read-only Doppler service token scoped to that configuration. Under
+**Settings → Secrets and variables → Actions → New repository secret**, add only
+`DOPPLER_SERVICE_TOKEN`. The token selects the Doppler project/configuration;
+no additional project or configuration variables are needed. Once configured,
+remove the old three ingestion secrets from GitHub Actions.
+
+The wrapper fetches configuration over HTTPS and passes only the three required
+Doppler variables to the ingestion process. It removes the service token from
+the child environment, rejects redirects, and fails if Doppler is unavailable
+or required values are missing. It does not write secrets to files, command-line
+arguments, GitHub environment/output files, or logs. Child output is suppressed
+to prevent exception details or export identifiers from leaking into CI logs;
+only a generic success/failure message is emitted. Do not enable shell tracing
+or add environment/secret dumps to the workflow. Check `fitness.ingest_runs` in
+Supabase for ingestion counts and outcomes.
 
 `.github/workflows/daily-ingest.yml` schedules ingestion **daily at 6:00 AM IST**
 using cron `0 6 * * *` with timezone `Asia/Kolkata`. Scheduled workflows run from
@@ -161,7 +177,7 @@ The job uses Python 3.11 and installs with:
 
 ```sh
 pip install -c requirements.lock '.[drive]'
-python -m server.ingest --source drive
+python -m server.doppler_ingest
 ```
 
 Archives go into a temporary runner directory via `STRAVA_SYNC_ARCHIVE` and are
